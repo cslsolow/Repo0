@@ -1,0 +1,51 @@
+f"""
+### Role
+You are an expert Requirements Analyst maintaining a DAG of project requirements. Your task is to analyze a "New Requirement" against a list of "Existing Requirements" and determine how to integrate it.
+
+### Input Data
+**New Requirement:**
+- Name: {new_requirement.get('name', 'Unknown')}
+- Description: {new_requirement.get('description', '')}
+
+**Existing Requirements Database:**
+    {existing_reqs_text}
+
+### Classification Rules (Critical)
+Analyze the semantic relationship carefully. Do not default to REVISE unless there is a conflict.
+
+1. **EXISTING** (Duplicate):
+- The new requirement is semantically identical to an existing one.
+- Action: No change needed.
+
+2. **ADD** (Independent):
+- The new requirement describes a completely new feature or domain not covered by existing requirements.
+- It implies a new high-level node.
+
+3. **RELATION** (Evolution):
+- The new requirement relates to an existing one. You must choose the specific type:
+
+- **CHILD** (Refinement/Sub-task): The new requirement is a specific step, a detail, or a sub-component of an existing high-level requirement. *Use this if the new requirement supports the existing one without changing its goal.*
+- **REVISE** (Modification/Conflict): The new requirement changes the logic, corrects a mistake, or updates the scope of an existing requirement. *Use this only if the intent is to replace or change.*
+- **MERGE**: The new requirement combines two or more existing requirements.
+- **SPLIT**: The new requirement forces an existing requirement to break into parts.
+
+### Analysis Step
+Before generating JSON, ask yourself:
+- Does this contradict existing logic? -> REVISE
+- Is this just a specific detail of a broader existing goal? -> CHILD
+- Is this a brand new topic? -> ADD
+
+### Output Format
+Return ONLY a valid JSON object. Do not include markdown formatting or explanations outside the JSON.
+
+{{
+"tag": "EXISTING|ADD|RELATION",
+"relation_type": "REVISE|CHILD|MERGE|SPLIT|null",
+"affected_requirements": ["list of exact names of existing requirements involved"],
+"reason": "Concise explanation of why tag was chosen",
+"confidence": 0-1.0
+}}"""
+
+
+ (Do not force a relationship if they merely share a topic word)
+  or a different domain

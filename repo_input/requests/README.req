@@ -1,0 +1,69 @@
+Requests: A Pythonic HTTP Library for Human Beings
+
+Requests is an elegant and simple HTTP library for the Python programming language that brings
+simplicity and humanity to HTTP interactions. Designed from the ground up to prioritize developer
+experience and ease of use, Requests has become one of the most widely adopted Python packages in
+the ecosystem, with approximately 30 million downloads per week and over 1 million repositories
+depending on it. The library serves as the de facto standard for HTTP communication in Python,
+enabling developers to interact seamlessly with web services, REST APIs, and remote HTTP endpoints
+without needing to grapple with the complexity of lower-level HTTP handling. At its core, Requests
+abstracts away the intricacies of network programming while providing a clean, intuitive, and
+Pythonic interface that works for both simple one-off API calls and complex, long-lived sessions
+with persistent configuration. The library is built on top of urllib3 for the underlying transport
+layer, adding sophisticated session management, flexible authentication support, and a comprehensive
+suite of convenience features that make HTTP communication feel natural and effortless for Python
+developers.
+
+The library provides complete support for the entire HTTP/1.1 request-response cycle, enabling
+developers to construct HTTP requests using all standard methods (GET, POST, PUT, PATCH, DELETE, HEAD,
+OPTIONS) with minimal boilerplate, manage request parameters through query strings with automatic
+encoding, submit form data using application/x-www-form-urlencoded encoding, transmit structured data
+using JSON serialization directly within the library, and upload multipart files with support for
+customizable content types and headers. Beyond basic request construction, Requests handles HTTP
+redirects transparently by automatically following Location headers with intelligent method conversion
+when appropriate and maintaining or stripping authentication credentials based on redirect destination
+to ensure security. The library implements persistent session management that maintains configuration,
+cookies, and pooled connections across multiple requests, providing significant performance benefits
+for making many requests to the same host. Sessions support browser-style TLS/SSL verification with
+custom CA bundle support and client certificate authentication, implement both HTTP Basic
+Authentication and Digest Authentication schemes with challenge-response mechanisms including MD5 and
+SHA-256 digest algorithms and stale nonce handling, and allow developers to create custom
+authentication handlers by implementing callable objects that modify requests before transmission.
+Requests also integrates seamlessly with network environments by supporting HTTP and HTTPS proxies
+through configuration options, handling SOCKS proxies for protocols beyond HTTP, automatically
+detecting proxy settings from environment variables with support for NO_PROXY configuration, and
+managing the .netrc configuration file for automatic authentication credential extraction. The library
+provides robust error handling through a comprehensive exception hierarchy that distinguishes between
+connection failures, timeout conditions, SSL/TLS certificate failures, proxy errors, HTTP protocol
+violations, and JSON parsing failures, allowing developers to implement sophisticated error recovery
+strategies tailored to specific failure modes. Advanced features include streaming responses for
+processing large response bodies without loading them entirely into memory, automatic content
+decompression for gzip and deflate encoded responses, intelligent character encoding detection and
+automatic decoding of response bodies in the appropriate character set, handling of chunked transfer
+encoding for both requests and responses, case-insensitive header handling for robust header access,
+request/response hooks that enable extending functionality at critical points in the request
+lifecycle through callback functions, connection pooling and keep-alive connections for improved
+performance when making multiple requests, fine-grained timeout control with separate settings for
+connection establishment and response data reading, status code reference mappings for convenient
+status code checking, and comprehensive cookie management with domain-aware persistence using a
+dict-like interface for cookie access. The implementation maintains compatibility with both CPython
+and PyPy interpreters while supporting Python 3.8 and later versions, ensuring broad compatibility
+across the Python ecosystem.
+
+Requests delivers a comprehensive HTTP communication framework that abstracts complexity while
+providing developers with an intuitive, Pythonic interface for every aspect of HTTP interaction,
+from simple GET requests to complex API workflows involving authentication, redirects, sessions, and
+error handling. The library orchestrates multiple components working in harmony: the convenient API
+functions provide entry points for quick requests, the Session class manages persistent state and
+configuration, Request and PreparedRequest objects encapsulate request intent and finalized form,
+HTTPAdapter handles the underlying urllib3 connection pools and protocol details, Response objects
+wrap server replies with automatic decoding, and a comprehensive exception hierarchy maps network and
+protocol errors to appropriate exceptions for consistent error handling. By elegantly combining these
+components, Requests provides a complete solution for modern web API consumption in Python
+applications, enabling developers to focus on their application logic rather than the mechanics of
+HTTP communication. The library's philosophy emphasizes human-centric design, transparency in error
+handling, sensible defaults that work for most use cases, and the ability to customize behavior when
+needed, making it equally suitable for quick scripts and production-grade applications requiring
+reliability and robustness.
+
+The library should explicitly cover session lifecycle semantics, adapter layering, retries, streaming transfers, proxy and certificate configuration, and environment-sensitive runtime behavior without exposing implementation recipes. The system should provide high-level diagnostics and debugging surfaces for request preparation, transport decisions, compatibility checks, and optional environment integrations so failure modes remain observable and reproducible. The project should include developer- and test-oriented capability expectations around cache reuse, request/response validation, and interoperability with surrounding HTTP tooling and deployment environments.
