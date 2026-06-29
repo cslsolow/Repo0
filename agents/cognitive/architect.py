@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
+import json
 import re
 from typing import Any, Dict, Iterable, List, Set
 
@@ -33,7 +34,7 @@ class SubRequirement:
 class ArchitectAgent:
     """Decompose high-level requirements into granular sub-requirements and rebuild the DAG."""
 
-    def __init__(self, max_sub_requirements: int = 3, min_description_length: int = 100, api_config: Dict[str, Any] | None = None, output_dir: str = ".", max_workers: int = 4) -> None:
+    def __init__(self, max_sub_requirements: int = 12, min_description_length: int = 100, api_config: Dict[str, Any] | None = None, output_dir: str = ".", max_workers: int = 4) -> None:
         self.max_sub_requirements = max_sub_requirements
         self.min_description_length = min_description_length
         self.api_config = api_config or {}
@@ -95,12 +96,17 @@ class ArchitectAgent:
                     new_adjacency.setdefault(sub_node.name, set())
                     sub_names.append(sub_node.name)
                 
-                # Connect sub-requirements sequentially within the same parent
+                # Connect sub-requirements using labeled dependencies when available.
                 if sub_names:
-                    for i, current_sub_name in enumerate(sub_names):
-                        if i > 0:
-                            prev_sub_name = sub_names[i - 1]
-                            new_adjacency[prev_sub_name].add(current_sub_name)
+                    explicit_edges = self._add_labeled_sub_requirement_edges(
+                        sub_requirements,
+                        new_adjacency,
+                    )
+                    if explicit_edges == 0:
+                        for i, current_sub_name in enumerate(sub_names):
+                            if i > 0:
+                                prev_sub_name = sub_names[i - 1]
+                                new_adjacency[prev_sub_name].add(current_sub_name)
                 else:
                     logging.warning(f"Failed to decompose '{parent_node.name}': {sub_names}")
                 
@@ -165,86 +171,178 @@ class ArchitectAgent:
         )
 
     def decompose_requirement(self, requirement: RequirementNode) -> List[SubRequirement]:
-        """Break down a single requirement into multiple sub-requirements using LLM."""
+        """Break down a single requirement through reasoning-first DAG labeling."""
         if not self.llm_client:
             return self._fallback_decompose_requirement(requirement)
-        
-        prompt = f"""You are a software architect expert. Decompose the following high-level requirement into **at most {self.max_sub_requirements}** concrete, actionable sub-requirements.
 
-Requirement Name: {requirement.name}
-Description: {requirement.description}
-
-CRITICAL RULES:
-1. Aim for **2-3 sub-requirements maximum** - only split if truly necessary
-2. Each sub-requirement should be **substantial and independently implementable**
-3. Avoid over-decomposition - merge related tasks into single sub-requirements
-4. Skip trivial sub-tasks (documentation, testing) - focus on core implementation only
-
-For each sub-requirement, provide:
-- name: A SHORT unique identifier (just the sub-name part, e.g., "core-logic", "api-interface")
-- description: A clear, actionable description of what needs to be implemented
-- order: Execution order (0-based, sequential)
-
-Return ONLY a JSON array of sub-requirement objects. Each should represent a meaningful chunk of work.
-
-Note: Keep names concise - they will be prefixed with the parent requirement name automatically.
-"""
-        
         try:
+            analysis = self._generate_requirement_analysis(requirement)
             response = self.llm_client.call_json([
-                {"role": "system", "content": "You are an expert software architect. Always return valid JSON arrays."},
-                {"role": "user", "content": prompt}
+                {"role": "system", "content": "You are an expert software architect. Always return one valid JSON object."},
+                {"role": "user", "content": self._build_sub_requirement_label_prompt(requirement, analysis)},
             ])
-            
-            if isinstance(response, list):
-                sub_reqs_data = response
-            elif isinstance(response, dict) and "sub_requirements" in response:
-                sub_reqs_data = response["sub_requirements"]
-            elif isinstance(response, dict) and "requirements" in response:
-                sub_reqs_data = response["requirements"]
-            else:
-                sub_reqs_data = [response] if isinstance(response, dict) else []
-            
-            sub_requirements: list[SubRequirement] = []
-            for i, sub_data in enumerate(sub_reqs_data[: self.max_sub_requirements]):
-                # Handle both dict and non-dict responses
-                if isinstance(sub_data, dict):
-                    raw_name = str(sub_data.get("name", f"sub-{i}"))
-                    # Clean up the name - remove parent prefix if LLM included it
-                    if "::" in raw_name:
-                        # If LLM included parent prefix, extract just the sub-name part
-                        sub_name_part = raw_name.split("::")[-1]
-                    else:
-                        sub_name_part = raw_name
-                    
-                    # Construct full name with parent prefix
-                    name = f"{requirement.name}::{sub_name_part}"
-                    description = str(sub_data.get("description", "Implement sub-requirement"))
-                    order = int(sub_data.get("order", i))
-                    metadata = sub_data
-                else:
-                    # If sub_data is not a dict, create a minimal representation
-                    name = f"{requirement.name}::sub-{i}"
-                    description = str(sub_data) if sub_data else "Implement sub-requirement"
-                    order = i
-                    metadata = {"raw_data": sub_data}
-                
-                sub_requirements.append(
-                    SubRequirement(
-                        name=name,
-                        description=description,
-                        parent=requirement.name,
-                        order=order,
-                        metadata=metadata,
-                    )
-                )
-            
+            sub_requirements = self._sub_requirements_from_label_response(
+                requirement,
+                analysis,
+                response,
+            )
             logging.info(f"Successfully decomposed requirement '{requirement.name}' into {len(sub_requirements)} sub-requirements")
             return sub_requirements if sub_requirements else self._fallback_decompose_requirement(requirement)
         
         except Exception as e:
             logging.warning(f"LLM decomposition failed for '{requirement.name}' ({e}), using fallback")
             return self._fallback_decompose_requirement(requirement)
+
+    def _generate_requirement_analysis(self, requirement: RequirementNode) -> str:
+        """Generate a self-contained analysis before labeling sub-requirements."""
+        prompt = f"""You are a software architect expert. Analyze the high-level requirement below in as much detail as needed before decomposing it.
+
+Requirement Name: {requirement.name}
+Description: {requirement.description}
+
+Your analysis should make the requirement self-contained for later decomposition. Cover:
+- intended behavior and user-visible functionality
+- important inputs, outputs, data contracts, and interface expectations
+- constraints, invariants, and error cases
+- internal responsibilities that may need separate implementation treatment
+- ambiguous or underspecified scope that should be preserved for planning
+
+Do not produce sub-requirements yet. Return only a JSON object:
+{{
+  "analysis": "detailed self-contained requirement reasoning"
+}}
+"""
+        response = self.llm_client.call_json([
+            {"role": "system", "content": "You are an expert software architect. Always return one valid JSON object."},
+            {"role": "user", "content": prompt},
+        ])
+        if isinstance(response, dict):
+            analysis = str(response.get("analysis") or response.get("thought") or response.get("reasoning") or "").strip()
+            if analysis:
+                return analysis
+        return requirement.description.strip()
+
+    def _build_sub_requirement_label_prompt(self, requirement: RequirementNode, analysis: str) -> str:
+        return f"""You are tasked with labeling a self-contained requirement analysis into a sub-requirement DAG.
+
+Parent Requirement: {requirement.name}
+Original Description: {requirement.description}
+
+Complete Requirement Analysis:
+{analysis}
+
+Instructions:
+1. Break the analysis into concrete sub-requirements only where separable requirement-side functionality may need an independent behavioral contract during implementation.
+2. Do not target a fixed number of sub-requirements. Use as many or as few as the requirement analysis justifies.
+3. Each sub-requirement must describe requirement-side functionality, not packages, files, classes, or implementation components.
+4. Avoid documentation-only and testing-only sub-requirements.
+5. For each sub-requirement, list dependency indices for earlier sub-requirements that the current sub-requirement logically follows. A dependency from u to v means that v relies on the behavior, output, data contract, or interface assumption established by u.
+6. Dependencies must point only to previous sub-requirements using zero-based indices. Use an empty list when the sub-requirement can be understood directly from the enriched requirement description.
+
+Return only a JSON object:
+{{
+  "analysis": "brief explanation of how the analysis was segmented",
+  "sub_requirements": [
+    {{
+      "name": "short-name-without-parent-prefix",
+      "description": "clear requirement-side functionality",
+      "depend": [0],
+      "rationale": "why this sub-requirement is separated"
+    }}
+  ]
+}}
+"""
+
+    def _sub_requirements_from_label_response(
+        self,
+        requirement: RequirementNode,
+        analysis: str,
+        response: Any,
+    ) -> List[SubRequirement]:
+        if not isinstance(response, dict):
+            return []
+        raw_subs = response.get("sub_requirements")
+        if not isinstance(raw_subs, list):
+            raw_subs = response.get("sub-requirements")
+        if not isinstance(raw_subs, list):
+            raw_subs = response.get("sub_questions")
+        if not isinstance(raw_subs, list):
+            raw_subs = response.get("sub-questions")
+        if not isinstance(raw_subs, list):
+            return []
+
+        sub_requirements: list[SubRequirement] = []
+        used_names: set[str] = set()
+        for i, sub_data in enumerate(raw_subs[: self.max_sub_requirements]):
+            if not isinstance(sub_data, dict):
+                continue
+            sub_name_part = self._normalize_sub_requirement_name(
+                sub_data.get("name") or sub_data.get("description"),
+                fallback=f"sub-{i}",
+            )
+            if sub_name_part in used_names:
+                sub_name_part = f"{sub_name_part}-{i}"
+            used_names.add(sub_name_part)
+            description = str(sub_data.get("description") or "").strip()
+            if not description:
+                description = f"Implement sub-requirement {sub_name_part} for {requirement.name}"
+            metadata = {
+                "analysis": analysis,
+                "label_analysis": response.get("analysis") or response.get("thought") or "",
+                "depend": self._normalize_dependency_indices(sub_data.get("depend"), upper_bound=i),
+                "rationale": str(sub_data.get("rationale") or sub_data.get("reason") or "").strip(),
+            }
+            sub_requirements.append(
+                SubRequirement(
+                    name=f"{requirement.name}::{sub_name_part}",
+                    description=description,
+                    parent=requirement.name,
+                    order=i,
+                    metadata=metadata,
+                )
+            )
+        return sub_requirements
+
+    def _normalize_dependency_indices(self, value: Any, upper_bound: int) -> List[int]:
+        if not isinstance(value, list):
+            return []
+        deps: list[int] = []
+        for item in value:
+            try:
+                dep = int(item)
+            except (TypeError, ValueError):
+                continue
+            if 0 <= dep < upper_bound and dep not in deps:
+                deps.append(dep)
+        return deps
+
+    def _add_labeled_sub_requirement_edges(
+        self,
+        sub_requirements: List[SubRequirement],
+        adjacency: dict[str, set[str]],
+    ) -> int:
+        added = 0
+        names = [sub.name for sub in sub_requirements]
+        for target_index, sub_req in enumerate(sub_requirements):
+            deps = sub_req.metadata.get("depend", [])
+            if not isinstance(deps, list):
+                continue
+            for dep in deps:
+                if not isinstance(dep, int) or dep < 0 or dep >= target_index:
+                    continue
+                source_name = names[dep]
+                target_name = sub_req.name
+                adjacency.setdefault(source_name, set()).add(target_name)
+                added += 1
+        return added
+
+    def _normalize_sub_requirement_name(self, value: Any, fallback: str) -> str:
+        """Return the local sub-requirement name without parent prefixes."""
+        raw_name = str(value or fallback).strip() or fallback
+        sub_name = raw_name.split("::")[-1].strip()
+        sub_name = re.sub(r"\s+", "-", sub_name.lower())
+        sub_name = re.sub(r"[^a-z0-9_.-]+", "", sub_name)
+        return sub_name or fallback
     
     def _fallback_decompose_requirement(self, requirement: RequirementNode) -> List[SubRequirement]:
         """Fallback to heuristic-based decomposition when LLM is unavailable."""
