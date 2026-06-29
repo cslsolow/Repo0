@@ -75,7 +75,7 @@ Environment Context:
 {environment_feedback}{dag_context}
 
 CRITICAL INSTRUCTIONS:
-1. Prefer 2-4 components total. Only exceed 4 when there is a clear, unavoidable architectural boundary.
+1. Prefer a compact set of components. Introduce additional components only when there is a clear architectural boundary.
 2. Each component should serve multiple related sub-requirements. Avoid 1:1 mapping between sub-requirements and components.
 3. Optimize for the smallest set of high-cohesion, clearly ownable modules, not the longest feature checklist.
 4. Merge adjacent responsibilities when they share the same data model, lifecycle, owner, and change together in practice.
@@ -170,7 +170,7 @@ Description: {requirement_payload.get('description', requirement_text)}
 Environment Context:
 {environment_feedback}{dag_context}
 
-Design an architecture with 2-4 components by default. Only exceed 4 when there is a clear architectural boundary that justifies it.
+Design a compact architecture. Introduce additional components only when there is a clear architectural boundary that justifies it.
 
 General component granularity rules:
 - Prefer fewer, broader, high-cohesion components over many thin wrappers.
@@ -183,7 +183,7 @@ General component granularity rules:
 
 For each component, specify:
 - name: Component name (PascalCase)
-- responsibilities: Array of specific responsibilities (2-4 items)
+- responsibilities: Array of specific responsibilities; use as many as needed to describe the component clearly without turning the list into a feature checklist.
 
 Return ONLY a JSON object with:
 {{

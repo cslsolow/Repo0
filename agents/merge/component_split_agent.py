@@ -277,7 +277,7 @@ Additional signal:
 
 Be conservative. Keep the component as-is by default.
 Split only when the component clearly mixes multiple stable module boundaries or distinct responsibilities that should be owned and evolved separately.
-Do NOT split into tiny helpers, utility buckets, or thin wrappers. Prefer 2-3 coherent subcomponents maximum.
+Do NOT split into tiny helpers, utility buckets, or thin wrappers. Prefer the most compact set of coherent child components justified by the partition evidence.
 
 Return JSON only:
 {{
