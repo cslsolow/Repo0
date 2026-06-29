@@ -30,7 +30,7 @@ Repo0 main artifact pipeline
 4. Add missing actions when input requirements are not covered.
 5. Compute component cohesion and coupling.
 6. Use metrics to drive split and merge:
-   - split: deterministic metric decision; no LLM approval.
+   - split: low-cohesion metric trigger plus requirement-graph partition evidence for LLM rewriting.
    - merge: metric candidate reviewed by the LLM judge.
    - repeat until no split or merge is proposed.
 7. Run the final revise round over the optimized architecture.

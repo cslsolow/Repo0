@@ -283,6 +283,7 @@ def test_component_split_prompt_includes_metric_rationale_and_confidence_signal(
     prompt = captured["messages"][1]["content"]
     assert "Metric split trigger: cohesion=0.667 with 3 served subrequirements." in prompt
     assert "metric_split" in prompt
+    assert "split_partition_groups" in prompt
     assert "`confidence` must be a JSON number between 0 and 1." in prompt
     assert split_detail["decision"] == "split"
     assert [row["name"] for row in split_components] == ["Core", "API"]
@@ -437,6 +438,40 @@ def test_component_split_only_triggers_for_explicit_split_action():
     assert agent._should_split_component(broad_component) is True
 
 
+def test_action_hints_propagate_split_partition_evidence():
+    architectures = [
+        {
+            "parent_task": "ReqSplit",
+            "architecture": {
+                "components": [
+                    {"name": "Wide", "serves_subrequirements": ["A", "B", "C"]},
+                ]
+            },
+        }
+    ]
+    actions = [
+        {
+            "task": "ReqSplit",
+            "actions": [
+                {
+                    "component": "Wide",
+                    "action": "split",
+                    "split_partition_evidence": {
+                        "served_subrequirements": ["A", "B", "C"],
+                        "induced_edges": [{"source": "A", "target": "B"}],
+                    },
+                }
+            ],
+        }
+    ]
+
+    hinted = apply_action_hints_to_architectures(architectures, actions)
+
+    component = hinted[0]["architecture"]["components"][0]
+    assert component["recommended_action"] == "split"
+    assert component["split_partition_evidence"]["induced_edges"] == [{"source": "A", "target": "B"}]
+
+
 def test_augment_actions_with_component_metrics_upgrades_save_to_split_and_merge():
     decomposed_dag = RequirementDAG(
         nodes={
@@ -521,6 +556,15 @@ def test_augment_actions_with_component_metrics_upgrades_save_to_split_and_merge
     }
     assert split_actions["Wide"] == "split"
     assert split_actions["Stable"] == "save"
+    split_row = [
+        row
+        for entry in augmented
+        if entry["task"] == "ReqSplit"
+        for row in entry["actions"]
+        if row["component"] == "Wide"
+    ][0]
+    assert split_row["split_partition_evidence"]["served_subrequirements"] == ["A", "C", "D"]
+    assert split_row["split_partition_evidence"]["induced_edges"] == []
 
     merge_rows = [
         row

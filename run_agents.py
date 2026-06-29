@@ -2282,6 +2282,7 @@ def apply_action_hints_to_architectures(
             comp_copy.pop("recommended_action_rationale", None)
             comp_copy.pop("recommended_target_component", None)
             comp_copy.pop("recommended_action_origin", None)
+            comp_copy.pop("split_partition_evidence", None)
             action_row = actions_by_parent.get(parent, {}).get(str(comp_copy.get("name") or "").strip())
             if isinstance(action_row, dict):
                 comp_copy["recommended_action"] = str(action_row.get("action") or "").strip()
@@ -2294,6 +2295,9 @@ def apply_action_hints_to_architectures(
                 action_origin = str(action_row.get("action_origin") or "").strip()
                 if action_origin:
                     comp_copy["recommended_action_origin"] = action_origin
+                partition_evidence = action_row.get("split_partition_evidence")
+                if isinstance(partition_evidence, dict):
+                    comp_copy["split_partition_evidence"] = partition_evidence
             hinted_components.append(comp_copy)
         architecture["components"] = hinted_components
         arch_copy["architecture"] = architecture
@@ -2796,12 +2800,26 @@ def augment_actions_with_component_metrics(
                 f"with {chosen_metrics['size']} served subrequirements."
             )
             row["action_origin"] = "metric_split"
+            served_subrequirements = sorted(chosen_metrics["subrequirements"])
+            induced_edges = [
+                {"source": left, "target": right}
+                for left, right in sorted(dag_edges)
+                if left in chosen_metrics["subrequirements"] and right in chosen_metrics["subrequirements"]
+            ]
+            row["split_partition_evidence"] = {
+                "served_subrequirements": served_subrequirements,
+                "induced_edges": induced_edges,
+                "cohesion": round(float(chosen_metrics["cohesion"]), 6),
+                "internal_edges": int(chosen_metrics["internal_edges"]),
+                "possible_internal_edges": float(chosen_metrics["possible_internal_edges"]),
+            }
             report["stats"]["split_upgrades"] += 1
             parent_report["split_upgrades"].append(
                 {
                     "component": chosen_name,
                     "cohesion": round(float(chosen_metrics["cohesion"]), 6),
                     "subrequirement_count": int(chosen_metrics["size"]),
+                    "induced_edges": induced_edges,
                 }
             )
 
@@ -7246,6 +7264,7 @@ def main() -> None:
         component_split_agent = ComponentSplitAgent(
             api_config=api_config,
             output_dir=str(output_dir),
+            enable_llm_split=True,
             split_min_confidence=float(args.component_split_min_confidence),
         )
 

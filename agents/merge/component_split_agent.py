@@ -5,7 +5,8 @@ from __future__ import annotations
 import copy
 import json
 import logging
-from typing import Any, Dict, List, Tuple
+import itertools
+from typing import Any, Dict, List, Optional, Tuple
 
 from agents.infra.llm_client import LLMClient
 
@@ -13,7 +14,7 @@ from .component_merge_agent import _dedupe_text_list
 
 
 class ComponentSplitAgent:
-    """Split metric-selected broad components without a second LLM approval."""
+    """Split metric-selected broad components using requirement partition evidence."""
 
     def __init__(
         self,
@@ -130,13 +131,18 @@ class ComponentSplitAgent:
                 "source_component_index": source_index,
             }
 
-        split_count = min(self.split_max_output_components, max(2, min(3, len(serves_subrequirements))))
-        groups = [[] for _ in range(split_count)]
-        for idx, subreq in enumerate(serves_subrequirements):
-            groups[idx % split_count].append(subreq)
+        partition_groups = self._partition_subrequirements(component, serves_subrequirements)
+        component_with_evidence = dict(component)
+        component_with_evidence["split_partition_groups"] = partition_groups
+        if self.enable_llm_split and self.llm_client is not None:
+            return self._split_component_with_llm(
+                parent_task,
+                component_with_evidence,
+                source_index,
+            )
 
         raw_split = []
-        for idx, group in enumerate(groups, start=1):
+        for idx, group in enumerate(partition_groups, start=1):
             if not group:
                 continue
             raw_split.append(
@@ -161,11 +167,66 @@ class ComponentSplitAgent:
         return normalized, {
             "component_name": source_name,
             "decision": "split",
-            "reason": "Deterministic metric split accepted without LLM approval.",
+            "reason": "Metric split accepted from requirement partition evidence.",
             "confidence": 1.0,
             "source_component_index": source_index,
+            "partition_groups": partition_groups,
             "split_into": [str(item.get("name", "")).strip() for item in normalized],
         }
+
+    def _partition_subrequirements(
+        self,
+        component: Dict[str, Any],
+        serves_subrequirements: List[str],
+    ) -> List[List[str]]:
+        max_split_count = min(self.split_max_output_components, max(2, min(3, len(serves_subrequirements))))
+        evidence = component.get("split_partition_evidence", {})
+        induced_edges = evidence.get("induced_edges", []) if isinstance(evidence, dict) else []
+        edges = set()
+        for edge in induced_edges if isinstance(induced_edges, list) else []:
+            if not isinstance(edge, dict):
+                continue
+            source = str(edge.get("source", "")).strip()
+            target = str(edge.get("target", "")).strip()
+            if source and target and source in serves_subrequirements and target in serves_subrequirements and source != target:
+                edges.add(tuple(sorted((source, target))))
+        if not edges:
+            return self._round_robin_groups(serves_subrequirements, max_split_count)
+
+        best_groups: Optional[List[List[str]]] = None
+        best_score: Optional[Tuple[int, int, int, Tuple[Tuple[str, ...], ...]]] = None
+        for split_count in range(2, max_split_count + 1):
+            assignments = itertools.product(range(split_count), repeat=len(serves_subrequirements))
+            for assignment in assignments:
+                if len(set(assignment)) < split_count:
+                    continue
+                groups = [[] for _ in range(split_count)]
+                for subreq, group_idx in zip(serves_subrequirements, assignment):
+                    groups[group_idx].append(subreq)
+                canonical = tuple(sorted(tuple(group) for group in groups if group))
+                group_by_subreq = {
+                    subreq: group_idx
+                    for group_idx, group in enumerate(groups)
+                    for subreq in group
+                }
+                cut_edges = sum(
+                    1 for left, right in edges
+                    if group_by_subreq.get(left) != group_by_subreq.get(right)
+                )
+                size_imbalance = max(len(group) for group in groups) - min(len(group) for group in groups)
+                group_count_penalty = len(groups)
+                score = (cut_edges, group_count_penalty, size_imbalance, canonical)
+                if best_score is None or score < best_score:
+                    best_score = score
+                    best_groups = [list(group) for group in groups if group]
+        return best_groups or self._round_robin_groups(serves_subrequirements, max_split_count)
+
+    @staticmethod
+    def _round_robin_groups(serves_subrequirements: List[str], split_count: int) -> List[List[str]]:
+        groups = [[] for _ in range(split_count)]
+        for idx, subreq in enumerate(serves_subrequirements):
+            groups[idx % split_count].append(subreq)
+        return [group for group in groups if group]
 
     def _split_component_with_llm(
         self,
@@ -187,6 +248,8 @@ class ComponentSplitAgent:
         action = str(component.get("recommended_action") or "").strip()
         rationale = str(component.get("recommended_action_rationale") or "").strip()
         action_origin = str(component.get("recommended_action_origin") or "").strip()
+        partition_evidence = component.get("split_partition_evidence", {})
+        partition_groups = component.get("split_partition_groups", [])
         prompt = f"""
 You are a senior software architect focused on splitting overly broad architecture components.
 
@@ -199,15 +262,18 @@ Source component:
     "recommended_action": action,
     "recommended_action_rationale": rationale,
     "recommended_action_origin": action_origin,
+    "split_partition_evidence": partition_evidence,
+    "split_partition_groups": partition_groups,
 }, ensure_ascii=False, indent=2)}
 
 Task:
-Decide whether this component should stay as-is or be split into smaller, cohesive components.
+Split this component into smaller, cohesive components using the provided partition evidence.
 
 Additional signal:
 - `recommended_action` and `recommended_action_rationale` come from an upstream structural candidate generator.
-- Treat these as candidate evidence, not as binding truth.
-- If the metric/rationale suggests a plausible split, reflect that in your confidence even if you are not fully certain.
+- `split_partition_evidence` contains the induced requirement-level subgraph for the component.
+- `split_partition_groups` are graph-partitioning groups obtained from a minimum-cut objective over that induced subgraph.
+- Treat the partition groups as structural evidence for the split, but rewrite component names, responsibilities, and interface assumptions so each child is a coherent implementation responsibility.
 
 Be conservative. Keep the component as-is by default.
 Split only when the component clearly mixes multiple stable module boundaries or distinct responsibilities that should be owned and evolved separately.
@@ -231,8 +297,8 @@ Valid examples: 0.70, 0.78, 0.91
 Do NOT use words such as high/medium/low or percentages.
 
 Decision criteria:
-1) Choose "keep" unless there is strong evidence that the source component combines multiple independently ownable modules.
-2) Split only when the source responsibilities can be partitioned into clearly distinct clusters with low overlap.
+1) Use the partition groups as the starting point for assigning served sub-requirements to child components.
+2) Split only when the partition evidence corresponds to clearly distinct clusters with low overlap.
 3) Reject splitting when the responsibilities mostly describe one workflow, one public API surface, or one stable subsystem with internal helper steps.
 4) Reject splitting when the result would create helper-like, adapter-only, metadata-only, or orchestration-only fragments.
 5) Each proposed split component must still be a meaningful module that could plausibly justify its own file and tests.

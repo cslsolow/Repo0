@@ -27,7 +27,7 @@ Repo0 follows the paper's zero-to-repository generation process:
 4. Add missing actions when input requirements are not covered by the generated requirement graph.
 5. Compute component cohesion and coupling from the requirement/component alignment.
 6. Use metrics to drive structural evolution:
-   - `split`: triggered by low cohesion and executed deterministically without LLM approval.
+   - `split`: triggered by low cohesion, guided by requirement-graph partition evidence, and rewritten by the LLM into child component responsibilities.
    - `merge`: triggered by high coupling and admitted only after an LLM merge judge verifies redundant responsibility.
 7. Repeat structural refinement until no split or merge is proposed.
 8. Run a final boundary-preserving `revise` round.
@@ -138,4 +138,3 @@ In a typical artifact workflow:
 ## 🙏 Acknowledgements
 
 We thank the authors and maintainers of RPG and RPG-ZeroRepo for their repository-generation benchmark and evaluation infrastructure. Repo0's evaluation process is built to interoperate with the RPG-ZeroRepo workflow at https://github.com/microsoft/RPG-ZeroRepo.
-

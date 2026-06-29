@@ -103,6 +103,7 @@ def run_from_existing_architecture(
     component_split_agent = ComponentSplitAgent(
         api_config=api_config,
         output_dir=str(output_dir),
+        enable_llm_split=True,
         split_min_confidence=float(args.component_split_min_confidence),
     )
     logging.info(
