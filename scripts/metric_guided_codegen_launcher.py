@@ -358,7 +358,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--run-label", default="metric_guided_codegen")
     parser.add_argument("--run-ts", default=_default_run_ts())
     parser.add_argument("--python-bin", type=Path, default=DEFAULT_PYTHON_BIN)
-    parser.add_argument("--base-url", default="https://api.qingyuntop.top/v1")
+    parser.add_argument("--base-url", default=os.environ.get("OPENAI_BASE_URL", ""))
     parser.add_argument("--api-key", default=os.environ.get("API_KEY", ""))
     parser.add_argument("--model", default="gpt-5-mini")
     parser.add_argument("--reasoning-effort", default="medium")

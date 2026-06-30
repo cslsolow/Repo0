@@ -47,7 +47,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--base-url",
         type=str,
-        default="https://aihubmix.com/v1",
+        default=os.environ.get("OPENAI_BASE_URL", ""),
         help="API base URL"
     )
     parser.add_argument(

@@ -43,17 +43,18 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-The pipeline uses an OpenAI-compatible chat-completions endpoint. Set `API_KEY` before running:
+The pipeline uses an OpenAI-compatible chat-completions endpoint. Set `API_KEY` and `BASE_URL` before running:
 
 ```bash
 export API_KEY="your_api_key"
+export BASE_URL="https://your-openai-compatible-endpoint/v1"
 ```
 
 Optional environment variables:
 
 - `REPO_NAME`: input project name. Default: `requests`.
 - `MODEL`: model name. Default: `gpt-5-mini`.
-- `BASE_URL`: OpenAI-compatible API base URL.
+- `BASE_URL`: OpenAI-compatible API base URL. This can also be provided as `OPENAI_BASE_URL`.
 - `MAX_WORKERS`: parallel worker count. Default: `8`.
 - `OUTPUT_DIR`: output directory. Default: `outputs/${REPO_NAME}`.
 
@@ -68,7 +69,7 @@ bash run_repo0_main.sh
 Run a specific included input:
 
 ```bash
-REPO_NAME=statsmodels API_KEY="$API_KEY" bash run_repo0_main.sh
+REPO_NAME=statsmodels API_KEY="$API_KEY" BASE_URL="$BASE_URL" bash run_repo0_main.sh
 ```
 
 Included requirement-only inputs are:

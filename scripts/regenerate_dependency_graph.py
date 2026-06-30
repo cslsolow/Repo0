@@ -90,7 +90,7 @@ def parse_args() -> argparse.Namespace:
         default=ROOT,
         help="Repo0 workspace root. Defaults to the current project root.",
     )
-    parser.add_argument("--base-url", type=str, default="https://aihubmix.com/v1")
+    parser.add_argument("--base-url", type=str, default=os.environ.get("OPENAI_BASE_URL", ""))
     parser.add_argument("--api-key", type=str, default="")
     parser.add_argument("--model", type=str, default="deepseek-v3.2")
     parser.add_argument("--reasoning-effort", type=str, default="medium")

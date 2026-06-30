@@ -33,7 +33,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output-dir", type=Path, required=True, help="target agents_output directory for refined artifacts")
     parser.add_argument("--requirements-file", type=Path, required=True)
     parser.add_argument("--req-path", type=Path, required=True)
-    parser.add_argument("--base-url", default="https://api.qingyuntop.top/v1")
+    parser.add_argument("--base-url", default=os.environ.get("OPENAI_BASE_URL", ""))
     parser.add_argument("--api-key", default="")
     parser.add_argument("--model", default="gpt-5-mini")
     parser.add_argument("--reasoning-effort", default="medium")

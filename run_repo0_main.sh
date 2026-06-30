@@ -5,13 +5,18 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 REPO_NAME="${REPO_NAME:-requests}"
 MODEL="${MODEL:-gpt-5-mini}"
-BASE_URL="${BASE_URL:-https://api.qingyuntop.top/v1}"
+BASE_URL="${BASE_URL:-${OPENAI_BASE_URL:-}}"
 API_KEY="${API_KEY:-}"
 MAX_WORKERS="${MAX_WORKERS:-8}"
 ACTION_REVISE_ROUNDS="${ACTION_REVISE_ROUNDS:-8}"
 
 if [[ -z "${API_KEY}" ]]; then
   echo "ERROR: set API_KEY before running Repo0." >&2
+  exit 2
+fi
+
+if [[ -z "${BASE_URL}" ]]; then
+  echo "ERROR: set BASE_URL or OPENAI_BASE_URL to an OpenAI-compatible endpoint before running Repo0." >&2
   exit 2
 fi
 
