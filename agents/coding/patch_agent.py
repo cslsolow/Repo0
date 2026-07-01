@@ -831,7 +831,7 @@ Return ONLY JSON:
         if compile_error.strip():
             return "compile_error_fix"
         combined = f"{task_description} {incremental_goal}".lower()
-        if any(token in combined for token in ["新增", "增量", "feature", "new requirement", "implement"]):
+        if any(token in combined for token in ["feature", "new requirement", "implement", "incremental", "add"]):
             return "incremental_feature"
         return "bug_fix"
 
@@ -1025,8 +1025,8 @@ Return ONLY JSON:
             return None
 
         patterns = [
-            r"(?:add|新增|增加|实现)\s*(?:function|method|函数|方法)?\s*([A-Za-z_][A-Za-z0-9_]*)",
-            r"([A-Za-z_][A-Za-z0-9_]*)\s*(?:function|method|函数|方法)",
+            r"(?:add|implement)\s*(?:function|method)?\s*([A-Za-z_][A-Za-z0-9_]*)",
+            r"([A-Za-z_][A-Za-z0-9_]*)\s*(?:function|method)",
         ]
         for pattern in patterns:
             match = re.search(pattern, text, flags=re.IGNORECASE)

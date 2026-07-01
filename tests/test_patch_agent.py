@@ -150,10 +150,10 @@ def test_generate_patch_heuristic_supports_incremental_stub():
     }
 
     result = agent.generate_patch(
-        task_description="增量开发",
+        task_description="incremental development",
         related_files=related,
         compile_error="",
-        incremental_goal="新增函数 calculate_total",
+        incremental_goal="add function calculate_total",
     )
 
     assert "core/service.py" in result["touched_files"]

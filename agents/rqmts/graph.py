@@ -82,11 +82,11 @@ class Graph:
 
     def to_dot(self):
         lines = ["digraph G {"]
-        # 声明所有节点
+        # Declare all nodes.
         for node in self.nodes.values():
             safe_name = node.name.replace('"', '\\"')
             lines.append(f'    "{safe_name}";')
-        # 声明所有有向边
+        # Declare all directed edges.
         for node in self.nodes.values():
             from_name = node.name.replace('"', '\\"')
             for neighbor in node.edges:

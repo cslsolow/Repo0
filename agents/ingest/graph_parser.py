@@ -415,7 +415,7 @@ def build_graph_from_requirements_and_edges(
             graph.add_edge(parent_name, child_name)
 
     if graph.has_cycle():
-        raise ValueError("通过 requirements.json 和 edges.json 构建出的图存在环，非 DAG。")
+        raise ValueError("The graph built from requirements.json and edges.json contains a cycle and is not a DAG.")
 
     return graph
 
