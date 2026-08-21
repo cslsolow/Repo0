@@ -139,3 +139,20 @@ In a typical artifact workflow:
 ## 🙏 Acknowledgements
 
 We thank the authors and maintainers of RPG and RPG-ZeroRepo for their repository-generation benchmark and evaluation infrastructure. Repo0's evaluation process is built to interoperate with the RPG-ZeroRepo workflow at https://github.com/microsoft/RPG-ZeroRepo.
+
+
+## Citation
+
+If you find this work helpful for your research or development, please consider citing our paper:
+
+```bibtex
+@misc{chen2026repo0designdrivenzerotoallcode,
+      title={Repo0: Design-Driven Zero-to-All Code Generation}, 
+      author={Silin Chen and Haoyi Teng and Xiaodong Gu and Yuling Shi and Jiale Huang and Yongpan Wang and Hongyu Zhang and Haibing Guan},
+      year={2026},
+      eprint={2608.19854},
+      archivePrefix={arXiv},
+      primaryClass={cs.SE},
+      url={https://arxiv.org/abs/2608.19854}, 
+}
+```
